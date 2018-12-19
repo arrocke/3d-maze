@@ -4,7 +4,7 @@ export default ({ selector, setup, update, draw, resize }) => {
   const gl = canvas.getContext('webgl')
 
   if (!gl) {
-    throw new Exception('WebGL not supported')
+    throw new Error('WebGL not supported')
   }
 
   let state = setup({ gl })
@@ -31,6 +31,8 @@ export default ({ selector, setup, update, draw, resize }) => {
       doResize()
     }
 
+    // Clear the canvas and redraw.
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
     state = draw({ gl, state }) 
 
     // Wait to render next frame.
