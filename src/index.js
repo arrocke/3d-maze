@@ -1,57 +1,101 @@
-import loop from './loop'
-import shaderProgram from './shader-program'
-import vertexSource from './shaders/default.vert'
-import fragmentSource from './shaders/default.frag'
+import * as THREE from 'three'
 
-loop({
-  selector: '#app',
-  setup: ({ gl }) => {
-    gl.clearColor(0.0, 0.0, 0.0, 1.0)
+const canvas = document.querySelector('canvas')
 
-    const program = shaderProgram(gl, vertexSource, fragmentSource)
-    const positionAttrib = gl.getAttribLocation(program, 'position')
-    const colorUniform = gl.getUniformLocation(program, 'color')
+const scene = new THREE.Scene()
+const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000)
 
-    const triangle = {
-      vertices: new Float32Array([
-        0.0, 0.0, -1.0,
-        0.0, 0.5, -1.0,
-        0.7, 0.0, -1.0
-      ]),
-      color: new Float32Array([
-        1.0, 0.0, 0.0, 1.0
-      ]),
-      buffer: gl.createBuffer()
-    }
+const renderer = new THREE.WebGLRenderer({ canvas })
+renderer.setSize(canvas.clientWidth, canvas.clientHeight, false)
+document.body.appendChild(renderer.domElement)
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, triangle.buffer)
-    gl.bufferData(gl.ARRAY_BUFFER, triangle.vertices, gl.STATIC_DRAW)
+// Ambient light
+const light = new THREE.AmbientLight(0x404040)
+scene.add(light)
 
-    return {
-      triangle,
-      program,
-      attributes: {
-        position: positionAttrib
-      },
-      uniforms: {
-        color: colorUniform
-      }
-    }
-  },
-  update: ({ gl, dt, state }) => {
-    state.triangle.color[0] = (state.triangle.color[0] + 0.005) % 1.0
-    return state
-  },
-  draw: ({ gl, state }) => {
-    gl.useProgram(state.program)
-    gl.enableVertexAttribArray(state.attributes.position)
-    gl.bindBuffer(gl.ARRAY_BUFFER, state.triangle.buffer)
-    gl.vertexAttribPointer(state.attributes.position, 3, gl.FLOAT, false, 0, 0)
-    gl.uniform4fv(state.uniforms.color, state.triangle.color)
-    gl.drawArrays(gl.TRIANGLES, 0, 3)
-    return state
-  },
-  resize: ({ gl, state }) => {
-    return state
+// Daylight
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5)
+directionalLight.position.y = 1
+scene.add(directionalLight)
+
+// Maze
+const rows = 4
+const cols = 4
+const postWidth = 0.3
+const postSpacing = 2
+const wallHeight = 2
+const wallLength = postSpacing - postWidth
+const wallWidth = 0.1
+
+const rowData = [
+  true, true, false, false, true,
+  true, true, false, false, true,
+  true, true, false, false, true,
+  true, false, true, false, true
+]
+
+const colData = [
+  true, false, false, false, true,
+  true, false, true, false, true,
+  true, true, true, true, true,
+  true, true, false, false, true
+]
+
+const mazeMaterial = new THREE.MeshPhongMaterial({ color: 0xFF0000 })
+const maze = new THREE.Group()
+maze.rotation.y = 0.2
+maze.rotation.x = 0.4
+
+// Posts
+const mazePost = new THREE.Mesh(
+  new THREE.BoxGeometry(postWidth, wallHeight, postWidth),
+  mazeMaterial
+)
+for (let i = 0; i <= rows; i++) {
+  for (let j = 0; j <= cols; j++) {
+    const post = mazePost.clone()
+    post.position.set(postSpacing * i, 0, postSpacing * j)
+    maze.add(post)
   }
-})
+}
+
+// Walls
+const mazeWallH = new THREE.Mesh(
+  new THREE.BoxGeometry(wallLength, wallHeight, wallWidth),
+  mazeMaterial
+)
+for (let i = 0; i < rows; i++) {
+  for (let j = 0; j <= cols; j++) {
+    if (colData[(cols + 1) * i + j]) {
+      const wall = mazeWallH.clone()
+      wall.position.set(1 + postSpacing * i, 0, postSpacing * j)
+      maze.add(wall)
+    }
+  }
+}
+
+const mazeWallV = new THREE.Mesh(
+  new THREE.BoxGeometry(wallWidth, wallHeight, wallLength),
+  mazeMaterial
+)
+mazeWallV.updateMatrix()
+for (let i = 0; i < cols; i++) {
+  for (let j = 0; j <= rows; j++) {
+    if (rowData[(rows + 1) * i + j]) {
+      const wall = mazeWallH.clone()
+      wall.rotation.y = Math.PI / 2
+      wall.position.set(postSpacing * j, 0, 1 + postSpacing * i)
+      maze.add(wall)
+    }
+  }
+}
+
+scene.add(maze)
+
+camera.position.z = 15;
+
+function animate() {
+  requestAnimationFrame(animate)
+  renderer.render(scene, camera)
+}
+animate()
